@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Student Management System",
+  "short_name": "Student Manager",
+  "description": "A simple student record app for learning and practice.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#1746a2",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1746a2">
+<meta name="description" content="A simple Student Management System for student records.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Student Management System</title>
+<style>
+:root{--blue:#1746a2;--pale:#eef4ff;--ink:#182230;--muted:#657184;--line:#dce3ee;--red:#b42318;--green:#067647}
+*{box-sizing:border-box}
+body{margin:0;background:#f4f7fb;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{background:linear-gradient(135deg,#1746a2,#2877d4);color:white;padding:24px 16px}
+.wrap{max-width:900px;margin:auto}
+header h1{font-size:1.55rem;margin:0 0 6px}
+header p{margin:0;color:#e8efff;font-size:.95rem}
+main{max-width:900px;margin:18px auto;padding:0 12px 36px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stat,.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 12px #13294b0a}
+.stat span{display:block;color:var(--muted);font-size:.86rem}
+.stat strong{font-size:1.6rem}
+.panel{margin-bottom:16px}
+h2{font-size:1.1rem;margin:0 0 14px}
+form{display:grid;grid-template-columns:1fr;gap:12px}
+label{font-size:.9rem;font-weight:650;display:block;margin-bottom:5px}
+input,select{width:100%;min-height:44px;border:1px solid #bdc8d8;border-radius:9px;padding:10px 11px;font:inherit;background:white;color:var(--ink)}
+input:focus,select:focus{outline:2px solid #9abaff;border-color:var(--blue)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+button{border:0;border-radius:9px;padding:11px 14px;min-height:42px;font:inherit;font-weight:650;cursor:pointer}
+.primary{background:var(--blue);color:white}
+.secondary{background:var(--pale);color:var(--blue)}
+.danger{background:#fff0ef;color:var(--red)}
+.searchrow{margin-bottom:12px}
+.student-list{display:grid;gap:10px}
+.student{border:1px solid var(--line);border-radius:11px;padding:13px;display:grid;gap:8px}
+.student h3{margin:0;font-size:1rem;overflow-wrap:anywhere}
+.student p{margin:3px 0;color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.student .actions{margin-top:2px}
+.empty{color:var(--muted);text-align:center;padding:18px 6px}
+.notice{font-size:.85rem;color:var(--muted);line-height:1.5;margin:10px 0 0}
+#message{padding:10px 12px;border-radius:8px;margin-bottom:12px;display:none;font-size:.9rem}
+#message.ok{display:block;background:#ecfdf3;color:var(--green)}
+#message.error{display:block;background:#fff0ef;color:var(--red)}
+footer{text-align:center;color:var(--muted);font-size:.8rem;padding:0 16px 24px}
+@media(min-width:620px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}form{grid-template-columns:1fr 1fr}.full{grid-column:1/-1}.student{grid-template-columns:1fr auto;align-items:center}.student .actions{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Student Management System</h1><p>A simple student record app for learning and practice</p></div></header>
+<main>
+  <section class="stats" aria-label="Summary">
+    <div class="stat"><span>Total students</span><strong id="totalCount">0</strong></div>
+    <div class="stat"><span>Departments</span><strong id="departmentCount">0</strong></div>
+    <div class="stat"><span>Academic years</span><strong id="yearCount">0</strong></div>
+  </section>
+  <div id="message" role="status" aria-live="polite"></div>
+  <section class="panel">
+    <h2 id="formTitle">Register a student</h2>
+    <form id="studentForm">
+      <div><label for="studentId">Student ID *</label><input id="studentId" name="studentId" placeholder="e.g. UOG-001" required maxlength="30"></div>
+      <div><label for="fullName">Full name *</label><input id="fullName" name="fullName" placeholder="Enter full name" required maxlength="80"></div>
+      <div><label for="department">Department *</label><input id="department" name="department" placeholder="e.g. Information System" required maxlength="80"></div>
+      <div><label for="year">Academic year *</label><select id="year" name="year" required><option value="">Choose year</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+      <div class="actions full"><button class="primary" id="saveButton" type="submit">Add student</button><button class="secondary" id="cancelButton" type="button" hidden>Cancel edit</button><button class="secondary" id="demoButton" type="button">Add sample data</button></div>
+    </form>
+    <p class="notice">Fields marked * are required. This beginner version stores records in this browser on this device.</p>
+  </section>
+  <section class="panel">
+    <h2>Student records</h2>
+    <div class="searchrow"><label for="search">Search by ID, name, or department</label><input id="search" placeholder="Type to search..."></div>
+    <div id="studentList" class="student-list"></div>
+    <div class="actions" style="margin-top:14px"><button class="secondary" id="exportButton" type="button">Export backup (JSON)</button></div>
+    <p class="notice">Keep a backup using Export. Clearing browser data or using a different browser may remove or hide saved records. Do not store sensitive real student information in this practice app.</p>
+  </section>
+</main>
+<footer>Student Management System · Beginner project</footer>
+<script>
+"use strict";
+const STORAGE_KEY = "sms_students_v1";
+const form = document.getElementById("studentForm");
+const idInput = document.getElementById("studentId");
+const nameInput = document.getElementById("fullName");
+const departmentInput = document.getElementById("department");
+const yearInput = document.getElementById("year");
+const searchInput = document.getElementById("search");
+const list = document.getElementById("studentList");
+const message = document.getElementById("message");
+let editingId = null;
+let students = loadStudents();
+
+function loadStudents() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+function saveStudents() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+    return true;
+  } catch (error) {
+    showMessage("Could not save data in this browser. Try normal browsing mode or export a backup.", true);
+    return false;
+  }
+}
+function showMessage(text, isError=false) {
+  message.textContent = text;
+  message.className = isError ? "error" : "ok";
+  message.style.display = "block";
+  window.setTimeout(() => { message.style.display = "none"; }, 3500);
+}
+function updateStats() {
+  document.getElementById("totalCount").textContent = students.length;
+  document.getElementById("departmentCount").textContent = new Set(students.map(s => s.department.toLowerCase())).size;
+  document.getElementById("yearCount").textContent = new Set(students.map(s => s.year)).size;
+}
+function makeText(tag, text, className) {
+  const el = document.createElement(tag);
+  el.textContent = text;
+  if (className) el.className = className;
+  return el;
+}
+function renderStudents() {
+  list.replaceChildren();
+  const q = searchInput.value.trim().toLowerCase();
+  const filtered = students.filter(s =>
+    s.studentId.toLowerCase().includes(q) ||
+    s.fullName.toLowerCase().includes(q) ||
+    s.department.toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    list.append(makeText("div", q ? "No matching students found." : "No students yet. Register a student above.", "empty"));
+  } else {
+    filtered.forEach(s => {
+      const card = document.createElement("article");
+      card.className = "student";
+      const details = document.createElement("div");
+      details.append(makeText("h3", s.fullName));
+      details.append(makeText("p", "ID: " + s.studentId));
+      details.append(makeText("p", "Department: " + s.department + " · Year: " + s.year));
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const edit = makeText("button", "Edit", "secondary");
+      edit.type = "button";
+      edit.addEventListener("click", () => startEdit(s.studentId));
+      const remove = makeText("button", "Delete", "danger");
+      remove.type = "button";
+      remove.addEventListener("click", () => deleteStudent(s.studentId));
+      actions.append(edit, remove);
+      card.append(details, actions);
+      list.append(card);
+    });
+  }
+  updateStats();
+}
+function resetForm() {
+  form.reset();
+  editingId = null;
+  document.getElementById("formTitle").textContent = "Register a student";
+  document.getElementById("saveButton").textContent = "Add student";
+  document.getElementById("cancelButton").hidden = true;
+  idInput.disabled = false;
+}
+function startEdit(studentId) {
+  const s = students.find(item => item.studentId === studentId);
+  if (!s) return;
+  editingId = studentId;
+  idInput.value = s.studentId;
+  nameInput.value = s.fullName;
+  departmentInput.value = s.department;
+  yearInput.value = s.year;
+  idInput.disabled = true;
+  document.getElementById("formTitle").textContent = "Edit student";
+  document.getElementById("saveButton").textContent = "Save changes";
+  document.getElementById("cancelButton").hidden = false;
+  form.scrollIntoView({behavior:"smooth", block:"start"});
+}
+function deleteStudent(studentId) {
+  const s = students.find(item => item.studentId === studentId);
+  if (!s || !window.confirm("Delete the record for " + s.fullName + "?")) return;
+  students = students.filter(item => item.studentId !== studentId);
+  if (saveStudents()) {
+    if (editingId === studentId) resetForm();
+    renderStudents();
+    showMessage("Student record deleted.");
+  }
+}
+form.addEventListener("submit", event => {
+  event.preventDefault();
+  const studentId = idInput.value.trim();
+  const fullName = nameInput.value.trim();
+  const department = departmentInput.value.trim();
+  const year = yearInput.value;
+  if (!studentId || !fullName || !department || !year) {
+    showMessage("Please complete every required field.", true);
+    return;
+  }
+  if (editingId === null && students.some(s => s.studentId.toLowerCase() === studentId.toLowerCase())) {
+    showMessage("That student ID already exists. Use a different ID.", true);
+    return;
+  }
+  if (editingId !== null) {
+    students = students.map(s => s.studentId === editingId ? {...s, fullName, department, year} : s);
+  } else {
+    students.push({studentId, fullName, department, year});
+  }
+  if (saveStudents()) {
+    renderStudents();
+    resetForm();
+    showMessage(editingId === null ? "Student added successfully." : "Student updated successfully.");
+  }
+});
+document.getElementById("cancelButton").addEventListener("click", resetForm);
+searchInput.addEventListener("input", renderStudents);
+document.getElementById("demoButton").addEventListener("click", () => {
+  const demo = [
+    {studentId:"UOG-001",fullName:"Abebe Kebede",department:"Information System",year:"1"},
+    {studentId:"UOG-002",fullName:"Hana Bekele",department:"Computer Science",year:"2"}
+  ];
+  let added = 0;
+  demo.forEach(d => {
+    if (!students.some(s => s.studentId.toLowerCase() === d.studentId.toLowerCase())) {
+      students.push(d); added++;
+    }
+  });
+  if (saveStudents()) {
+    renderStudents();
+    showMessage(added ? added + " sample record(s) added. You can edit or delete them." : "Sample records are already present.");
+  }
+});
+document.getElementById("exportButton").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(students, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "student-records-backup.json";
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+renderStudents();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
